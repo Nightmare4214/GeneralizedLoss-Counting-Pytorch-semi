@@ -36,8 +36,15 @@ def cal_new_size(im_h, im_w, min_size, max_size):
 
 
 def find_dis(point):
+    # a = point[:, None, :]
+    # b = point[None, ...]
+    # dis = np.linalg.norm(a - b, ord=2, axis=-1)  # dis_{i,j} = ||p_i - p_j||
+    # dis = np.mean(np.partition(dis, 3, axis=1)[:, 1:4], axis=1, keepdims=True)
+
     square = np.sum(point * points, axis=1)
+    # dis_{i,j} = ||p_i - p_j||
     dis = np.sqrt(np.maximum(square[:, None] - 2 * np.matmul(point, point.T) + square[None, :], 0.0))
+    # mean(4th_min, 2 of the [1th_min, 2nd_min, 3rd_min])
     dis = np.mean(np.partition(dis, 3, axis=1)[:, 1:4], axis=1, keepdims=True)
     return dis
 
