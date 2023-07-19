@@ -8,6 +8,7 @@ import torch
 from tensorboardX import SummaryWriter
 from timm.utils import AverageMeter
 from torch import optim
+from torch.optim.lr_scheduler import LinearLR, PolynomialLR
 from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from tqdm import tqdm
@@ -136,6 +137,8 @@ class EMDTrainer(Trainer):
         self.model.to(self.device)
         self.lr_lbfgs = args.lr_lbfgs
         self.optimizer = optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        # self.scheduler = LinearLR(self.optimizer, start_factor=0.1, total_iters=10)
+        self.scheduler = PolynomialLR(self.optimizer, total_iters=args.max_epoch, power=0.9)
 
         self.start_epoch = 0
         if args.resume:
@@ -145,6 +148,8 @@ class EMDTrainer(Trainer):
                 self.model.load_state_dict(checkpoint['model_state_dict'])
                 self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 self.start_epoch = checkpoint['epoch'] + 1
+                if self.scheduler is not None and 'scheduler' in checkpoint:
+                    self.scheduler.load_state_dict(checkpoint['scheduler'])
             elif suf == '.pth':
                 self.model.load_state_dict(torch.load(args.resume, self.device))
 
@@ -183,10 +188,10 @@ class EMDTrainer(Trainer):
         self.model.train()  # Set model to training mode
         # shape = (1, int(512 / self.args.downsample_ratio), int(512 / self.args.downsample_ratio))
         self.optimizer.zero_grad()
-        if epoch < 10:
-            for param_group in self.optimizer.param_groups:
-                if param_group['lr'] >= 0.1 * self.args.lr:
-                    param_group['lr'] = self.args.lr * (epoch + 1) / 10
+        # if epoch < 10:
+        #     for param_group in self.optimizer.param_groups:
+        #         if param_group['lr'] >= 0.1 * self.args.lr:
+        #             param_group['lr'] = self.args.lr * (epoch + 1) / 10
         print('learning rate: {}, batch size: {}'.format(self.optimizer.param_groups[0]['lr'], self.args.batch_size))
         for step, (inputs, points, targets, st_sizes) in enumerate(tqdm(self.dataloaders['train'])):
             inputs = inputs.to(self.device)
@@ -248,6 +253,9 @@ class EMDTrainer(Trainer):
             epoch_loss.update(loss.item(), N)
             epoch_mse.update(np.mean(res * res), N)
             epoch_mae.update(np.mean(abs(res)), N)
+
+        self.scheduler.step()
+        # self.scheduler.step(epoch)
         self.writer.add_scalar('train/loss', epoch_loss.avg, self.epoch)
         self.writer.add_scalar('train/mae', epoch_mae.avg, self.epoch)
         self.writer.add_scalar('train/mse', np.sqrt(epoch_mse.avg), self.epoch)
@@ -260,6 +268,7 @@ class EMDTrainer(Trainer):
             'epoch': self.epoch,
             'optimizer_state_dict': self.optimizer.state_dict(),
             'model_state_dict': model_state_dic,
+            'scheduler': self.scheduler.state_dict() if self.scheduler else None
         }, save_path)
         self.save_list.append(save_path)  # control the number of saved models
 
