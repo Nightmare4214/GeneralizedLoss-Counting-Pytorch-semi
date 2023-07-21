@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from tqdm import tqdm
 
-from datasets.crowd import Crowd
+from datasets.crowd import Crowd, Crowd_sh
 from geomloss import SamplesLoss
 from models.vgg import vgg19
 from utils.cost_functions import ExpCost, PerCost, L2_DIS, PNormCost
@@ -117,11 +117,20 @@ class EMDTrainer(Trainer):
             raise Exception("gpu is not available")
 
         self.downsample_ratio = args.downsample_ratio
-        self.datasets = {x: Crowd(os.path.join(args.data_dir, x),
-                                  args.crop_size,
-                                  args.downsample_ratio,
-                                  args.is_gray, x
-                                  ) for x in ['train', 'val']}
+        if args.dataset == 'qnrf':
+            self.datasets = {x: Crowd(os.path.join(args.data_dir, x),
+                                      args.crop_size,
+                                      args.downsample_ratio,
+                                      args.is_gray, x
+                                      ) for x in ['train', 'val']}
+        elif args.dataset == 'sha':
+            self.datasets = {x: Crowd_sh(os.path.join(args.data_dir, x),
+                                         args.crop_size,
+                                         args.downsample_ratio,
+                                         x
+                                         ) for x in ['train', 'val']}
+        else:
+            raise NotImplementedError
         self.dataloaders = {x: DataLoader(self.datasets[x],
                                           collate_fn=(train_collate
                                                       if x == 'train' else default_collate),
@@ -137,8 +146,8 @@ class EMDTrainer(Trainer):
         self.model.to(self.device)
         self.lr_lbfgs = args.lr_lbfgs
         self.optimizer = optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        # self.scheduler = LinearLR(self.optimizer, start_factor=0.1, total_iters=10)
-        self.scheduler = PolynomialLR(self.optimizer, total_iters=args.max_epoch, power=0.9)
+        self.scheduler = LinearLR(self.optimizer, start_factor=0.1, total_iters=10)
+        # self.scheduler = PolynomialLR(self.optimizer, total_iters=args.max_epoch, power=0.9)
 
         self.start_epoch = 0
         if args.resume:

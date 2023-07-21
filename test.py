@@ -6,7 +6,7 @@ from tqdm import tqdm
 from cv2 import cv2
 import torch.nn.functional as F
 
-from datasets.crowd import Crowd
+from datasets.crowd import Crowd, Crowd_sh
 from models.vgg import vgg19
 import argparse
 
@@ -31,19 +31,38 @@ def parse_args():
     parser.add_argument('--save_dir',
                         default='/mnt/data/PycharmProject/GeneralizedLoss-Counting-Pytorch/ucf_vgg19_ot_84.pth',
                         help='model path')
+    parser.add_argument('--dataset', default='qnrf', help='dataset name: qnrf, nwpu, sha, shb')
     parser.add_argument('--device', default='0', help='assign device')
     parser.add_argument('--locate', default=False, required=False, action='store_true', help='locate crowd')
     parser.add_argument('--p_norm', type=float, default=2,
                         help='p_norm')  # ?
+    parser.add_argument('--crop_size', type=int, default=512,
+                        help='the crop size of the train image')
     args = parser.parse_args()
+    if args.dataset.lower() == 'qnrf':
+        args.crop_size = 512
+    elif args.dataset.lower() == 'nwpu':
+        args.crop_size = 384
+        args.val_epoch = 50
+    elif args.dataset.lower() == 'sha':
+        args.crop_size = 256
+    elif args.dataset.lower() == 'shb':
+        args.crop_size = 512
+    else:
+        raise NotImplementedError
     return args
 
 
 if __name__ == '__main__':
     args = parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
+    if args.dataset.lower() == 'qnrf':
+        datasets = Crowd(os.path.join(args.data_dir, 'test'), args.crop_size, 8, is_gray=False, method='val')
+    elif args.dataset.lower() == 'sha':
+        datasets = Crowd_sh(os.path.join(args.data_dir, 'test'), args.crop_size, 8, method='val')
+    else:
+        raise NotImplementedError
 
-    datasets = Crowd(os.path.join(args.data_dir, 'test'), 512, 8, is_gray=False, method='val')
     dataloader = torch.utils.data.DataLoader(datasets, 1, shuffle=False,
                                              num_workers=1, pin_memory=False)
     model = vgg19()

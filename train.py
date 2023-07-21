@@ -14,6 +14,7 @@ def parse_args():
                         help='directory to save models.')
     parser.add_argument('--data_dir', default='/mnt/data/datasets/UCF-Train-Val-Test',
                         help='training data directory')
+    parser.add_argument('--dataset', default='qnrf', help='dataset name: qnrf, nwpu, sha, shb')
     parser.add_argument('--o_cn', type=int, default=1,
                         help='output channel number')
     parser.add_argument('--cost', type=str, default='p_norm',
@@ -70,6 +71,17 @@ def parse_args():
                         help='downsample ratio')
 
     args = parser.parse_args()
+    if args.dataset.lower() == 'qnrf':
+        args.crop_size = 512
+    elif args.dataset.lower() == 'nwpu':
+        args.crop_size = 384
+        args.val_epoch = 50
+    elif args.dataset.lower() == 'sha':
+        args.crop_size = 256
+    elif args.dataset.lower() == 'shb':
+        args.crop_size = 512
+    else:
+        raise NotImplementedError
     return args
 
 
