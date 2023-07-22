@@ -58,7 +58,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
     if args.dataset.lower() == 'qnrf':
         datasets = Crowd(os.path.join(args.data_dir, 'test'), args.crop_size, 8, is_gray=False, method='val')
-    elif args.dataset.lower() == 'sha':
+    elif args.dataset.lower() in ['sha', 'shb']:
         datasets = Crowd_sh(os.path.join(args.data_dir, 'test'), args.crop_size, 8, method='val')
     else:
         raise NotImplementedError

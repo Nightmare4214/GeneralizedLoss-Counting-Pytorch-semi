@@ -46,6 +46,8 @@ def parse_args():
                         help='the learning rate for lbfgs')
     parser.add_argument('--weight_decay', type=float, default=1e-5,
                         help='the weight decay')
+    parser.add_argument('--scheduler', type=str, default='poly',
+                        help='scheduler')
     parser.add_argument('--resume', default='',
                         help='the path of resume training model')
     parser.add_argument('--max_model_num', type=int, default=1,
