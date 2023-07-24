@@ -4,24 +4,34 @@ unofficial implement
 
 ## Data
 
-Dowload Dataset UCF-QNRF [Link](https://www.crcv.ucf.edu/data/ucf-qnrf/)
+Dowload Dataset UCF-QNRF [Link](https://www.crcv.ucf.edu/data/ucf-qnrf/)  
+Download Shanghai Tech Part A and Part B[Link](https://www.kaggle.com/tthien/shanghaitech)  
+Download NWPU[Link](https://www.crowdbenchmark.com/nwpucrowd.html)  
 
 ## Data preparation
 
-```
+### UCF-QNRF
+```bash
 python preprocess_dataset.py --origin_dir PATH_TO_ORIGIN_DATASET --data_dir PATH_TO_DATASET
 ```
+
+### Shanghai Tech
+
+```bash
+python preprocess_shanghai.py --origin_dir PATH_TO_ORIGIN_DATASET --data_dir PATH_TO_DATASET --part 'A'
+```
+
 [//]: # (The dataset can be constructed followed by [Bayesian Loss]&#40;https://github.com/ZhihengCV/Bayesian-Crowd-Counting&#41;.)
 
 ## Test
 
-```
+```bash
 python test.py --data_dir PATH_TO_DATASET --save_dir PATH_TO_CHECKPOINT
 ```
 
 ## Train
 
-```
+```bash
 python train.py --data_dir PATH_TO_DATASET --save_dir PATH_TO_CHECKPOINT
 ```
 

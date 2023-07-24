@@ -39,7 +39,8 @@ def parse_args():
                         help='divergence for point loss')
     parser.add_argument('--d_pixel', type=str, default='l2',
                         help='divergence for pixel loss')
-
+    parser.add_argument('--phi', type=str, default='kl',
+                        help='divergence')
     parser.add_argument('--lr', type=float, default=1e-5,
                         help='the initial learning rate')
     parser.add_argument('--lr_lbfgs', type=float, default=1,

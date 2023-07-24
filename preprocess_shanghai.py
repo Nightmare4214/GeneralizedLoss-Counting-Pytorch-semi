@@ -17,10 +17,13 @@ from tqdm.contrib import tzip
 def parse_args():
     parser = argparse.ArgumentParser(description='Test ')
     parser.add_argument('--origin_dir',
-                        default='/home/icml007/Nightmare4214/datasets/ShanghaiTech_Crowd_Counting_Dataset/part_B',
+                        default='/mnt/data/datasets/ShanghaiTech_Crowd_Counting_Dataset/part_B_final',
                         help='original data directory')
     parser.add_argument('--data_dir',
-                        default='/home/icml007/Nightmare4214/datasets/ShanghaiTech_Crowd_Counting_Dataset-Train-Val-Test/part_B',
+                        default='/mnt/data/datasets/ShanghaiTech_Crowd_Counting_Dataset-Train-Val-Test/part_B',
+                        help='processed data directory')
+    parser.add_argument('--part',
+                        default='B',
                         help='processed data directory')
     args = parser.parse_args()
     return args
@@ -30,28 +33,47 @@ if __name__ == '__main__':
     args = parse_args()
     origin_dir = args.origin_dir
     save_dir = args.data_dir
+    part = args.part
     os.makedirs(os.path.join(save_dir, 'train'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'val'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'test'), exist_ok=True)
 
     train_dir = os.path.join(origin_dir, 'train_data')
     train_image_dir = os.path.join(train_dir, 'images')
-    train_gt_dir = os.path.join(train_dir, 'ground-truth')
+    train_gt_dir = os.path.join(train_dir, 'ground_truth')
 
     test_dir = os.path.join(origin_dir, 'test_data')
     test_image_dir = os.path.join(test_dir, 'images')
-    test_gt_dir = os.path.join(test_dir, 'ground-truth')
+    test_gt_dir = os.path.join(test_dir, 'ground_truth')
 
-    train_image_paths = list(glob(os.path.join(train_image_dir, '*')))
-    train_image_paths.sort()
-    train_gt_paths = list(glob(os.path.join(train_gt_dir, '*')))
-    train_gt_paths.sort()
-    train_image_paths, val_image_paths, train_gt_paths, val_gt_paths = train_test_split(train_image_paths, train_gt_paths, test_size=0.2, random_state=42)
 
-    test_image_paths = list(glob(os.path.join(test_image_dir, '*')))
-    test_image_paths.sort()
-    test_gt_paths = list(glob(os.path.join(test_gt_dir, '*')))
-    test_gt_paths.sort()
+    train_image_paths = []
+    train_gt_paths = []
+    val_image_paths = []
+    val_gt_paths = []
+    test_image_paths = []
+    test_gt_paths = []
+
+    for line in open(f'part_{part}_train.txt', 'r'):
+        line = line.strip()
+        if not line:
+            continue
+        train_image_paths.append(os.path.join(train_image_dir, line))
+        train_gt_paths.append(os.path.join(train_gt_dir, 'GT_{}.mat'.format(os.path.splitext(line)[0])))
+    
+    for line in open(f'part_{part}_val.txt', 'r'):
+        line = line.strip()
+        if not line:
+            continue
+        val_image_paths.append(os.path.join(train_image_dir, line))
+        val_gt_paths.append(os.path.join(train_gt_dir, 'GT_{}.mat'.format(os.path.splitext(line)[0])))
+    
+    for line in open(f'part_{part}_test.txt', 'r'):
+        line = line.strip()
+        if not line:
+            continue
+        test_image_paths.append(os.path.join(test_image_dir, line))
+        test_gt_paths.append(os.path.join(test_gt_dir, 'GT_{}.mat'.format(os.path.splitext(line)[0])))
 
     for train_image_path, train_gt_path in tzip(train_image_paths, train_gt_paths):
         target_train_image_path = os.path.join(save_dir, 'train', os.path.relpath(train_image_path, train_image_dir))

@@ -32,8 +32,7 @@ def grid(H, W, stride):
     y, x = torch.meshgrid([coody.type(dtype) / 1, coodx.type(dtype) / 1], indexing='ij')  # (h_i, w_i)
     return torch.stack((x, y), dim=2).view(-1, 2)  # (w_i, h_i)
 
-
-def phi_conjugate(x):
+def kl_conjugate(x):
     """
     phi(x) = xln(x) - x + 1;
     phi*(x) = e^x - 1;
@@ -42,6 +41,25 @@ def phi_conjugate(x):
     :return: conjugate of phi (B, a, 1)
     """
     return x.exp() - 1
+
+def tv_conjugate(x):
+    """
+    phi(x) = |x - 1|;
+    phi*(x) = min{-1, x} x <= 1,
+              +inf, x > 1;
+
+    :param x: input (B, a, 1)
+    :return: conjugate of phi (B, a, 1)
+    """
+    return torch.min(x, -torch.ones_like(x))
+
+
+def phi_conjugate(x, phi_function='kl'):
+    if phi_function.lower() == 'kl':
+        return kl_conjugate(x)
+    elif phi_function.lower() == 'tv':
+        return tv_conjugate(x)
+    raise NotImplementedError
 
 
 def c_transform(C, beta, epsilon):
@@ -60,7 +78,7 @@ def c_transform(C, beta, epsilon):
     return -epsilon * torch.logsumexp((torch.transpose(beta, -1, -2) - C) / epsilon, dim=-1, keepdim=True)
 
 
-def G(C, beta, u, v, epsilon, reduction='mean'):
+def G(C, beta, u, v, epsilon, reduction='mean', phi_function='KL'):
     """
     -phi*(-alpha^epsilon)^T u - phi*(-beta)^T v
 
@@ -73,8 +91,8 @@ def G(C, beta, u, v, epsilon, reduction='mean'):
     :return:
     """
     alpha_epsilon = c_transform(C, beta, epsilon)  # alpha^epsilon
-    loss = -torch.bmm(torch.transpose(phi_conjugate(-alpha_epsilon), -1, -2), u) - torch.bmm(
-        torch.transpose(phi_conjugate(-beta), -1, -2), v)
+    loss = -torch.bmm(torch.transpose(phi_conjugate(-alpha_epsilon, phi_function), -1, -2), u) - torch.bmm(
+        torch.transpose(phi_conjugate(-beta, phi_function), -1, -2), v)
     if 'mean' == reduction:
         return torch.mean(loss)
     elif 'sum' == reduction:
@@ -141,8 +159,8 @@ class EMDTrainer(Trainer):
                                           pin_memory=(True if x == 'train' else False), drop_last=True)
                             for x in ['train', 'val']}
 
+        self.phi = args.phi
         self.model = vgg19()
-
         self.model.to(self.device)
         self.lr_lbfgs = args.lr_lbfgs
         self.optimizer = optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -242,7 +260,7 @@ class EMDTrainer(Trainer):
                     def closure():
                         lbfgs.zero_grad()
                         # max g => min -g
-                        g = -G(C, beta, u, v, self.blur)
+                        g = -G(C, beta, u, v, self.blur, phi_function=self.phi)
                         g.backward(inputs=beta)
                         return g
 
@@ -250,7 +268,7 @@ class EMDTrainer(Trainer):
                     lbfgs.step(closure)
                     beta = beta.detach()
                     beta.requires_grad = False
-                    loss += G(C, beta, u, v, self.blur)
+                    loss += G(C, beta, u, v, self.blur, phi_function=self.phi)
 
                 i += 1
 
