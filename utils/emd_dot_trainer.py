@@ -12,10 +12,12 @@ from torch.optim.lr_scheduler import LinearLR, PolynomialLR
 from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from tqdm import tqdm
+import wandb
 
 from datasets.crowd import Crowd, Crowd_sh
 from geomloss import SamplesLoss
 from models.vgg import vgg19
+from test import do_test, get_dataloader_by_args
 from utils.cost_functions import ExpCost, PerCost, L2_DIS, PNormCost
 from utils.helper import Save_Handle
 from utils.trainer import Trainer
@@ -115,6 +117,15 @@ class EMDTrainer(Trainer):
         args = self.args
         global scale
         scale = args.scale
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="GeneralizedLoss-Counting-semi",
+            name = os.path.basename(self.args.save_dir),
+            # track hyperparameters and run metadata
+            config=args,
+            # resume=True,
+            # sync_tensorboard=True
+        )
         self.norm_coord = args.norm_coord
         if args.cost == 'exp':
             self.cost = ExpCost(args.scale)
@@ -188,7 +199,7 @@ class EMDTrainer(Trainer):
 
         # self.log_dir = os.path.join('./runs', os.path.basename(args.save_dir))
         self.log_dir = os.path.join(args.save_dir, 'runs')
-        self.writer = SummaryWriter(self.log_dir)
+        # self.writer = SummaryWriter(self.log_dir)
 
         self.save_list = Save_Handle(max_num=args.max_model_num)
         self.best_mae_list = []
@@ -287,9 +298,14 @@ class EMDTrainer(Trainer):
 
         if self.scheduler is not None:
             self.scheduler.step()
-        self.writer.add_scalar('train/loss', epoch_loss.avg, self.epoch)
-        self.writer.add_scalar('train/mae', epoch_mae.avg, self.epoch)
-        self.writer.add_scalar('train/mse', np.sqrt(epoch_mse.avg), self.epoch)
+        wandb.log({
+            'train/loss': epoch_loss.avg,
+            'train/mae': epoch_mae.avg,
+            'train/mse': np.sqrt(epoch_mse.avg),
+        }, step=self.epoch)
+        # self.writer.add_scalar('train/loss', epoch_loss.avg, self.epoch)
+        # self.writer.add_scalar('train/mae', epoch_mae.avg, self.epoch)
+        # self.writer.add_scalar('train/mse', np.sqrt(epoch_mse.avg), self.epoch)
         logging.info('Epoch {} Train, Loss: {:.2f}, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
                      .format(self.epoch, epoch_loss.avg, np.sqrt(epoch_mse.avg), epoch_mae.avg,
                              time.time() - epoch_start))
@@ -327,8 +343,12 @@ class EMDTrainer(Trainer):
         epoch_res = np.array(epoch_res)
         mse = np.sqrt(np.mean(np.square(epoch_res)))
         mae = np.mean(np.abs(epoch_res))
-        self.writer.add_scalar(stage + '/mae', mae, self.epoch)
-        self.writer.add_scalar(stage + '/mse', mse, self.epoch)
+        wandb.log({
+            stage + '/mae': mae,
+            stage + '/mse': mse,
+        }, step=self.epoch)
+        # self.writer.add_scalar(stage + '/mae', mae, self.epoch)
+        # self.writer.add_scalar(stage + '/mse', mse, self.epoch)
         logging.info('{} Epoch {}, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
                      .format(stage, self.epoch, mse, mae, time.time() - epoch_start))
 
@@ -347,3 +367,11 @@ class EMDTrainer(Trainer):
         logging.info('Val: Best Epoch {} Val, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
                      .format(self.best_epoch['val'], self.best_mse['val'], self.best_mae['val'],
                              time.time() - epoch_start))
+    
+    def test(self):
+        dataloader = get_dataloader_by_args(self.args)
+        self.model.load_state_dict(torch.load(os.path.join(self.args.save_dir, 'best_val.pth'), self.device))
+        mae, mse = do_test(self.model, self.device, dataloader, self.args.data_dir, self.args.save_dir, locate=True)
+        wandb.summary['test_mae'] = mae
+        wandb.summary['test_mse'] = mse
+

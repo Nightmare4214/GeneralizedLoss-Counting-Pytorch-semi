@@ -95,3 +95,4 @@ if __name__ == '__main__':
     trainer = EMDTrainer(args)
     trainer.setup()
     trainer.train()
+    trainer.test()

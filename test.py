@@ -53,26 +53,25 @@ def parse_args():
     return args
 
 
-if __name__ == '__main__':
-    args = parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
+def get_dataloader_by_args(args):
     if args.dataset.lower() == 'qnrf':
         datasets = Crowd(os.path.join(args.data_dir, 'test'), args.crop_size, 8, is_gray=False, method='val')
     elif args.dataset.lower() in ['sha', 'shb']:
         datasets = Crowd_sh(os.path.join(args.data_dir, 'test'), args.crop_size, 8, method='val')
     else:
         raise NotImplementedError
+    return torch.utils.data.DataLoader(datasets, 1, shuffle=False,
+                                       num_workers=1, pin_memory=False)
 
-    dataloader = torch.utils.data.DataLoader(datasets, 1, shuffle=False,
-                                             num_workers=1, pin_memory=False)
-    model = vgg19()
-    device = torch.device('cuda')
-    model = model.to(device)
-    model.load_state_dict(torch.load(os.path.join(args.save_dir), device))
+def do_test(model, device, dataloader, data_dir, save_dir, locate=True, **kwargs):
     epoch_minus = []
-
-    if args.locate:
-        locate_dir = os.path.join(os.path.dirname(args.save_dir), 'predict')
+    model_dir = save_dir
+    if os.path.isdir(save_dir):
+        model_dir = os.path.join(save_dir, 'predict')
+    else:
+        model_dir = os.path.join(os.path.dirname(save_dir), 'predict')
+    if locate:
+        locate_dir = os.path.join(model_dir, 'predict')
         os.makedirs(locate_dir, exist_ok=True)
 
     with torch.no_grad():
@@ -87,7 +86,7 @@ if __name__ == '__main__':
             # print(name, temp_minu, len(count[0]), torch.sum(outputs).item())
             epoch_minus.append(temp_minu)
 
-            if args.locate:
+            if locate:
                 name = name[0] + '.jpg'
 
                 prob_outputs = F.interpolate(outputs, scale_factor=8, mode='bilinear')
@@ -97,7 +96,7 @@ if __name__ == '__main__':
                 maxpool_output = maxpool_output.squeeze().detach().cpu().numpy()
                 maxpool_output[maxpool_output < th] = 0
                 y, x = maxpool_output.nonzero()
-                img = cv2.imread(os.path.join(args.data_dir, 'test', name))
+                img = cv2.imread(os.path.join(data_dir, 'test', name))
                 for i, j in zip(y, x):
                     img = cv2.circle(img, (j, i), 3, (0, 0, 255), thickness=-1, lineType=cv2.LINE_AA)
                 cv2.imwrite(os.path.join(locate_dir, name), img)
@@ -107,5 +106,18 @@ if __name__ == '__main__':
     mae = np.mean(np.abs(epoch_minus))
     log_str = 'Final Test: mae {}, mse {}'.format(mae, mse)
     print(log_str)
-    with open(os.path.join(os.path.dirname(args.save_dir), 'predict.log'), 'w') as f:
+    with open(os.path.join(model_dir, 'predict.log'), 'w') as f:
         f.write(log_str + '\n')
+    return mae, mse
+
+if __name__ == '__main__':
+    args = parse_args()
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
+    
+    dataloader = get_dataloader_by_args(args)
+
+    model = vgg19()
+    device = torch.device('cuda')
+    model = model.to(device)
+    model.load_state_dict(torch.load(os.path.join(args.save_dir), device))
+    do_test(model, device, dataloader, args.data_dir, args.save_dir, locate=True)
