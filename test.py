@@ -67,9 +67,9 @@ def do_test(model, device, dataloader, data_dir, save_dir, locate=True, **kwargs
     epoch_minus = []
     model_dir = save_dir
     if os.path.isdir(save_dir):
-        model_dir = os.path.join(save_dir, 'predict')
+        model_dir = save_dir
     else:
-        model_dir = os.path.join(os.path.dirname(save_dir), 'predict')
+        model_dir = os.path.dirname(save_dir)
     if locate:
         locate_dir = os.path.join(model_dir, 'predict')
         os.makedirs(locate_dir, exist_ok=True)
