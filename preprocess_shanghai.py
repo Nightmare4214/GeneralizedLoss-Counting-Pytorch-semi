@@ -14,6 +14,36 @@ from tqdm import tqdm
 from tqdm.contrib import tzip
 
 
+def find_dis(point):
+    # a = point[:, None, :]
+    # b = point[None, ...]
+    # dis = np.linalg.norm(a - b, ord=2, axis=-1)  # dis_{i,j} = ||p_i - p_j||
+    # dis = np.mean(np.partition(dis, 3, axis=1)[:, 1:4], axis=1, keepdims=True)
+
+    square = np.sum(point * point, axis=1)
+    # dis_{i,j} = ||p_i - p_j||
+    dis = np.sqrt(np.maximum(square[:, None] - 2 * np.matmul(point, point.T) + square[None, :], 0.0))
+    # mean(4th_min, 2 of the [1th_min, 2nd_min, 3rd_min])
+    dis = np.mean(np.partition(dis, 3, axis=1)[:, 1:4], axis=1, keepdims=True)
+    return dis
+
+
+def generate_data(image_path, gt_path):
+    im = Image.open(image_path)
+    im_w, im_h = im.size
+    points = sio.loadmat(gt_path)['image_info'][0][0][0][0][0].astype(float)
+    idx_mask = (points[:, 0] >= 0) * (points[:, 0] <= im_w) * (points[:, 1] >= 0) * (points[:, 1] <= im_h)
+    points = points[idx_mask]
+    # im_h, im_w, rr = cal_new_size(im_h, im_w, min_size, max_size)
+    # im = np.array(im)
+    # if rr != 1.0:
+    #     im = cv2.resize(np.array(im), (im_w, im_h), cv2.INTER_CUBIC)
+    #     points = points * rr
+    # return Image.fromarray(im), points
+    return im, points
+
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Test ')
     parser.add_argument('--origin_dir',
@@ -78,18 +108,24 @@ if __name__ == '__main__':
     for train_image_path, train_gt_path in tzip(train_image_paths, train_gt_paths):
         target_train_image_path = os.path.join(save_dir, 'train', os.path.relpath(train_image_path, train_image_dir))
         shutil.copy(train_image_path, target_train_image_path)
-        keypoints = sio.loadmat(train_gt_path)['image_info'][0][0][0][0][0].astype(float)
+        _, keypoints = generate_data(train_image_path, train_gt_path)
+        dis = find_dis(keypoints)
+        keypoints = np.concatenate((keypoints, dis), axis=1)
         np.save(os.path.splitext(target_train_image_path)[0] + '.npy', keypoints)
 
     for val_image_path, val_gt_path in tzip(val_image_paths, val_gt_paths):
         target_val_image_path = os.path.join(save_dir, 'val', os.path.relpath(val_image_path, train_image_dir))
         shutil.copy(val_image_path, target_val_image_path)
-        keypoints = sio.loadmat(val_gt_path)['image_info'][0][0][0][0][0].astype(float)
+        _, keypoints = generate_data(train_image_path, train_gt_path)
+        dis = find_dis(keypoints)
+        keypoints = np.concatenate((keypoints, dis), axis=1)
         np.save(os.path.splitext(target_val_image_path)[0] + '.npy', keypoints)
 
     for test_image_path, test_gt_path in tzip(test_image_paths, test_gt_paths):
         target_test_image_path = os.path.join(save_dir, 'test', os.path.relpath(test_image_path, test_image_dir))
         shutil.copy(test_image_path, target_test_image_path)
-        keypoints = sio.loadmat(test_gt_path)['image_info'][0][0][0][0][0].astype(float)
+        _, keypoints = generate_data(train_image_path, train_gt_path)
+        dis = find_dis(keypoints)
+        keypoints = np.concatenate((keypoints, dis), axis=1)
         np.save(os.path.splitext(target_test_image_path)[0] + '.npy', keypoints)
 

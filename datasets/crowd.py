@@ -191,7 +191,7 @@ class Crowd_sh(data.Dataset):
         name = os.path.splitext(os.path.basename(img_path))[0]
         gd_path = os.path.join(self.root_path, name + '.npy')
         img = Image.open(img_path).convert('RGB')
-        keypoints = np.load(gd_path)
+        keypoints = np.load(gd_path)[:, :2]
 
         if self.method == 'train':
             return self.train_transform(img, keypoints)

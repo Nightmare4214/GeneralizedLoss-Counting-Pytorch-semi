@@ -61,7 +61,7 @@ paper: L2 + KL + epsilon=0.01: mae: 6.5, mse: 10.2
 
 | p_norm | norm  | blur | mae  | mse  |
 |--------|-------|------| ---- | ---- |
-| 2      | True  | 0.01 | 8.145707510694672    | 13.93822842209618   |
+| 2      | True  | 0.01 | 7.78297430955911    | 12.895112162260704   |
 
 ### Acknowledgement
 We use [GeomLoss](https://www.kernel-operations.io/geomloss/) package to compute transport matrix. Thanks for the authors for providing this fantastic tool. The code is slightly modified to adapt to our framework.
