@@ -116,7 +116,7 @@ if __name__ == '__main__':
     for val_image_path, val_gt_path in tzip(val_image_paths, val_gt_paths):
         target_val_image_path = os.path.join(save_dir, 'val', os.path.relpath(val_image_path, train_image_dir))
         shutil.copy(val_image_path, target_val_image_path)
-        _, keypoints = generate_data(train_image_path, train_gt_path)
+        _, keypoints = generate_data(val_image_path, val_gt_path)
         dis = find_dis(keypoints)
         keypoints = np.concatenate((keypoints, dis), axis=1)
         np.save(os.path.splitext(target_val_image_path)[0] + '.npy', keypoints)
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     for test_image_path, test_gt_path in tzip(test_image_paths, test_gt_paths):
         target_test_image_path = os.path.join(save_dir, 'test', os.path.relpath(test_image_path, test_image_dir))
         shutil.copy(test_image_path, target_test_image_path)
-        _, keypoints = generate_data(train_image_path, train_gt_path)
+        _, keypoints = generate_data(test_image_path, test_gt_path)
         dis = find_dis(keypoints)
         keypoints = np.concatenate((keypoints, dis), axis=1)
         np.save(os.path.splitext(target_test_image_path)[0] + '.npy', keypoints)
