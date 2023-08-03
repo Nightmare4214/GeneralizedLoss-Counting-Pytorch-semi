@@ -53,7 +53,12 @@ def tv_conjugate(x):
     :param x: input (B, a, 1)
     :return: conjugate of phi (B, a, 1)
     """
-    return torch.min(x, -torch.ones_like(x))
+    mask1 = x < -1
+    mask2 = x > 1
+    x[mask1] = -1
+    x[mask2] = torch.inf
+    # return torch.min(x, -torch.ones_like(x))
+    return x
 
 
 def phi_conjugate(x, phi_function='kl'):
@@ -117,6 +122,7 @@ class EMDTrainer(Trainer):
         args = self.args
         global scale
         scale = args.scale
+        # os.environ["WANDB_MODE"] = "offline"
         wandb.init(
             # set the wandb project where this run will be logged
             project="GeneralizedLoss-Counting-semi",
@@ -124,7 +130,8 @@ class EMDTrainer(Trainer):
             # track hyperparameters and run metadata
             config=args,
             # resume=True,
-            # sync_tensorboard=True
+            # sync_tensorboard=True,
+            # settings=wandb.Settings(start_method="fork")
         )
         self.norm_coord = args.norm_coord
         if args.cost == 'exp':
