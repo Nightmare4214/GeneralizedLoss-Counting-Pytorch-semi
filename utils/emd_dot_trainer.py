@@ -129,7 +129,7 @@ class EMDTrainer(Trainer):
             name = os.path.basename(self.args.save_dir),
             # track hyperparameters and run metadata
             config=args,
-            # resume=True,
+            resume=True if args.resume else None,
             # sync_tensorboard=True,
             # settings=wandb.Settings(start_method="fork")
         )
@@ -157,13 +157,13 @@ class EMDTrainer(Trainer):
             self.datasets = {x: Crowd(os.path.join(args.data_dir, x),
                                       args.crop_size,
                                       args.downsample_ratio,
-                                      args.is_gray, x
+                                      args.is_gray, x, extra_aug=args.extra_aug
                                       ) for x in ['train', 'val']}
         elif args.dataset in ['sha', 'shb']:
             self.datasets = {x: Crowd_sh(os.path.join(args.data_dir, x),
                                          args.crop_size,
                                          args.downsample_ratio,
-                                         x
+                                         x, extra_aug=args.extra_aug
                                          ) for x in ['train', 'val']}
         else:
             raise NotImplementedError
@@ -173,7 +173,7 @@ class EMDTrainer(Trainer):
                                           batch_size=(self.args.batch_size
                                                       if x == 'train' else 1),
                                           shuffle=(True if x == 'train' else False),
-                                          num_workers=args.num_workers * self.device_count,
+                                          num_workers=1,
                                           pin_memory=(True if x == 'train' else False), drop_last=True)
                             for x in ['train', 'val']}
 

@@ -72,6 +72,7 @@ def parse_args():
                         help='the crop size of the train image')
     parser.add_argument('--downsample_ratio', type=int, default=8,
                         help='downsample ratio')
+    parser.add_argument('--extra_aug', default=False, required=False, action='store_true', help='extra_aug')
 
     args = parser.parse_args()
     if args.dataset.lower() == 'qnrf':

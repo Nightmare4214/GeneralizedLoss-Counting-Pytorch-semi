@@ -76,11 +76,12 @@ def gen_discrete_map(im_height, im_width, points):
 class Crowd(data.Dataset):
     def __init__(self, root_path, crop_size,
                  downsample_ratio, is_gray=False,
-                 method='train', resize=False, im_list=None, noise=0):
+                 method='train', resize=False, im_list=None, noise=0, extra_aug=True):
 
         self.noise = noise
         self.root_path = root_path
         self.resize = resize
+        self.extra_aug = extra_aug
         if im_list is None:
             self.im_list = sorted(glob(os.path.join(self.root_path, '*.jpg')))
         else:
@@ -126,6 +127,18 @@ class Crowd(data.Dataset):
     def train_transform_with_crop(self, img, keypoints):
         """random crop image patch and find people in it"""
         wd, ht = img.size
+        if self.extra_aug:
+            # assert len(keypoints) > 0
+            if random.random() > 0.88:
+                img = img.convert('L').convert('RGB')
+            re_size = random.random() * 0.5 + 0.75
+            wdd = (int)(wd * re_size)
+            htt = (int)(ht * re_size)
+            if min(wdd, htt) >= self.c_size:
+                wd = wdd
+                ht = htt
+                img = img.resize((wd, ht))
+                keypoints = keypoints * re_size
         st_size = min(wd, ht)
         if st_size < self.c_size:
             c_size = 512
@@ -166,10 +179,11 @@ class Crowd(data.Dataset):
 class Crowd_sh(data.Dataset):
     def __init__(self, root_path, crop_size,
                  downsample_ratio=8,
-                 method='train'):
+                 method='train', extra_aug=True):
         self.root_path = root_path
         self.c_size = crop_size
         self.d_ratio = downsample_ratio
+        self.extra_aug = extra_aug
         assert self.c_size % self.d_ratio == 0
         self.dc_size = self.c_size // self.d_ratio
         self.trans = transforms.Compose([
@@ -203,6 +217,18 @@ class Crowd_sh(data.Dataset):
 
     def train_transform(self, img, keypoints):
         wd, ht = img.size
+        if self.extra_aug:
+            # assert len(keypoints) > 0
+            if random.random() > 0.88:
+                img = img.convert('L').convert('RGB')
+            re_size = random.random() * 0.5 + 0.75
+            wdd = (int)(wd * re_size)
+            htt = (int)(ht * re_size)
+            if min(wdd, htt) >= self.c_size:
+                wd = wdd
+                ht = htt
+                img = img.resize((wd, ht))
+                keypoints = keypoints * re_size
         st_size = 1.0 * min(wd, ht)
         # resize the image to fit the crop size
         if st_size < self.c_size:
