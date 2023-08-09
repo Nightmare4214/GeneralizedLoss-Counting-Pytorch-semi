@@ -61,7 +61,7 @@ def get_dataloader_by_args(args):
     else:
         raise NotImplementedError
     return torch.utils.data.DataLoader(datasets, 1, shuffle=False,
-                                       num_workers=1, pin_memory=False)
+                                       num_workers=0, pin_memory=False)
 
 def do_test(model, device, dataloader, data_dir, save_dir, locate=True, **kwargs):
     epoch_minus = []
@@ -100,6 +100,9 @@ def do_test(model, device, dataloader, data_dir, save_dir, locate=True, **kwargs
                 for i, j in zip(y, x):
                     img = cv2.circle(img, (j, i), 3, (0, 0, 255), thickness=-1, lineType=cv2.LINE_AA)
                 cv2.imwrite(os.path.join(locate_dir, name), img)
+            del inputs
+            del outputs
+            torch.cuda.empty_cache()
 
     epoch_minus = np.array(epoch_minus)
     mse = np.sqrt(np.mean(np.square(epoch_minus)))

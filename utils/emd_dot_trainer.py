@@ -173,11 +173,12 @@ class EMDTrainer(Trainer):
                                           batch_size=(self.args.batch_size
                                                       if x == 'train' else 1),
                                           shuffle=(True if x == 'train' else False),
-                                          num_workers=1,
+                                          num_workers=3 if x == 'train' else 0,
                                           pin_memory=(True if x == 'train' else False), drop_last=True)
                             for x in ['train', 'val']}
 
         self.phi = args.phi
+        torch.cuda.empty_cache()
         self.model = vgg19()
         self.model.to(self.device)
         self.lr_lbfgs = args.lr_lbfgs
@@ -345,6 +346,9 @@ class EMDTrainer(Trainer):
                 # points = points[0].type(torch.LongTensor)
                 # res = len(points) - torch.sum(outputs).item()
                 res = points.shape[1] - torch.sum(outputs).item()
+                del inputs
+                del outputs
+                torch.cuda.empty_cache()
                 epoch_res.append(res)
 
         epoch_res = np.array(epoch_res)
