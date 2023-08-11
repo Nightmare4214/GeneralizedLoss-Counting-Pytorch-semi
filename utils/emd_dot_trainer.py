@@ -123,16 +123,6 @@ class EMDTrainer(Trainer):
         global scale
         scale = args.scale
         # os.environ["WANDB_MODE"] = "offline"
-        wandb.init(
-            # set the wandb project where this run will be logged
-            project="GeneralizedLoss-Counting-semi",
-            name = os.path.basename(self.args.save_dir),
-            # track hyperparameters and run metadata
-            config=args,
-            resume=True if args.resume else None,
-            # sync_tensorboard=True,
-            # settings=wandb.Settings(start_method="fork")
-        )
         self.norm_coord = args.norm_coord
         if args.cost == 'exp':
             self.cost = ExpCost(args.scale)
@@ -189,8 +179,15 @@ class EMDTrainer(Trainer):
             self.scheduler = PolynomialLR(self.optimizer, total_iters=args.max_epoch, power=0.9)
         else:
             self.scheduler = None
-
+        self.best_mae = {}
+        self.best_mse = {}
+        self.best_epoch = {}
+        for stage in ['train', 'val']:
+            self.best_mae[stage] = np.inf
+            self.best_mse[stage] = np.inf
+            self.best_epoch[stage] = 0
         self.start_epoch = 0
+        self.wandb_id = None
         if args.resume:
             suf = os.path.splitext(args.resume)[-1]
             if suf == '.tar':
@@ -198,8 +195,13 @@ class EMDTrainer(Trainer):
                 self.model.load_state_dict(checkpoint['model_state_dict'])
                 self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 self.start_epoch = checkpoint['epoch'] + 1
-                if self.scheduler is not None and 'scheduler' in checkpoint:
+                if self.scheduler is not None and 'scheduler' in checkpoint and checkpoint['scheduler'] is not None:
                     self.scheduler.load_state_dict(checkpoint['scheduler'])
+                self.best_mae = checkpoint['best_mae']
+                self.best_mse = checkpoint['best_mse']
+                self.best_epoch = checkpoint['best_epoch']
+                if 'wandb_id' in checkpoint:
+                    self.wandb_id = checkpoint['wandb_id']
             elif suf == '.pth':
                 self.model.load_state_dict(torch.load(args.resume, self.device))
 
@@ -210,14 +212,18 @@ class EMDTrainer(Trainer):
         # self.writer = SummaryWriter(self.log_dir)
 
         self.save_list = Save_Handle(max_num=args.max_model_num)
-        self.best_mae_list = []
-        self.best_mae = {}
-        self.best_mse = {}
-        self.best_epoch = {}
-        for stage in ['train', 'val']:
-            self.best_mae[stage] = np.inf
-            self.best_mse[stage] = np.inf
-            self.best_epoch[stage] = 0
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="GeneralizedLoss-Counting-semi",
+            id = self.wandb_id,
+            name = os.path.basename(self.args.save_dir),
+            # track hyperparameters and run metadata
+            config=args,
+            resume=True if args.resume else None,
+            # sync_tensorboard=True,
+            # settings=wandb.Settings(start_method="fork")
+        )
+        self.wandb_id = wandb.run.id
 
     def train(self):
         """training process"""
@@ -323,7 +329,11 @@ class EMDTrainer(Trainer):
             'epoch': self.epoch,
             'optimizer_state_dict': self.optimizer.state_dict(),
             'model_state_dict': model_state_dic,
-            'scheduler': self.scheduler.state_dict() if self.scheduler else None
+            'scheduler': self.scheduler.state_dict() if self.scheduler else None,
+            'best_mae': self.best_mae,
+            'best_mse': self.best_mse,
+            'best_epoch': self.best_epoch,
+            'wandb_id': self.wandb_id
         }, save_path)
         self.save_list.append(save_path)  # control the number of saved models
 
