@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import random
 import time
 
 import numpy as np
@@ -20,6 +21,7 @@ from models.vgg import vgg19
 from test import do_test, get_dataloader_by_args
 from utils.cost_functions import ExpCost, PerCost, L2_DIS, PNormCost
 from utils.helper import Save_Handle
+from utils.pytorch_utils import seed_worker, setup_seed
 from utils.trainer import Trainer
 
 print(inspect.getfile(SamplesLoss))
@@ -120,6 +122,14 @@ class EMDTrainer(Trainer):
     def setup(self):
         """initial the datasets, model, loss and optimizer"""
         args = self.args
+        if args.randomless:
+            seed = args.seed
+            g = torch.Generator()
+            g.manual_seed(seed)
+            setup_seed(seed)
+        else:
+            torch.backends.cudnn.benchmark = True
+
         global scale
         scale = args.scale
         # os.environ["WANDB_MODE"] = "offline"
@@ -164,7 +174,8 @@ class EMDTrainer(Trainer):
                                                       if x == 'train' else 1),
                                           shuffle=(True if x == 'train' else False),
                                           num_workers=3 if x == 'train' else 0,
-                                          pin_memory=(True if x == 'train' else False), drop_last=True)
+                                          pin_memory=(True if x == 'train' else False), drop_last=True,
+                                          worker_init_fn=seed_worker if args.randomless else None, generator=g if args.randomless else None)
                             for x in ['train', 'val']}
 
         self.phi = args.phi
@@ -202,6 +213,10 @@ class EMDTrainer(Trainer):
                 self.best_epoch = checkpoint['best_epoch']
                 if 'wandb_id' in checkpoint:
                     self.wandb_id = checkpoint['wandb_id']
+                if args.randomless:
+                    random.setstate(checkpoint['random_state'])
+                    np.random.set_state(checkpoint['np_random_state'])
+                    torch.random.set_rng_state(checkpoint['torch_random_state'])
             elif suf == '.pth':
                 self.model.load_state_dict(torch.load(args.resume, self.device))
 
@@ -258,7 +273,7 @@ class EMDTrainer(Trainer):
             shape = (inputs.shape[0], int(inputs.shape[2] / self.args.downsample_ratio),
                      int(inputs.shape[3] / self.args.downsample_ratio))
 
-            outputs = self.model(inputs)
+            outputs = self.model(inputs)#(B, 1, 64, 64)
 
             i = 0
             loss = 0
@@ -270,16 +285,16 @@ class EMDTrainer(Trainer):
                     cood_grid = grid(outputs.shape[2], outputs.shape[3], 1).unsqueeze(
                         0) * self.args.downsample_ratio + (
                                         self.args.downsample_ratio / 2)
-                    cood_grid = cood_grid.type(torch.cuda.FloatTensor)
-                    cood_points = p.reshape(1, -1, 2)
+                    cood_grid = cood_grid.type(torch.cuda.FloatTensor)#(1, N, 2)
+                    cood_points = p.reshape(1, -1, 2)#(1, M, 2)
                     if self.norm_coord:
                         cood_grid = cood_grid / float(self.args.crop_size)  # (0, 1)
                         cood_points = cood_points / float(self.args.crop_size)
-                    C = self.cost(cood_grid, cood_points)
+                    C = self.cost(cood_grid, cood_points)#(1, N, M)
 
                     beta = torch.zeros(1, p.shape[0], 1, device=self.device, requires_grad=True)
-                    u = outputs[i].reshape(1, -1, 1)
-                    v = torch.ones(1, M, 1, device=self.device)
+                    u = outputs[i].reshape(1, -1, 1)#(1, N, 1)
+                    v = torch.ones(1, M, 1, device=self.device)#(1, M, 1)
                     lbfgs = torch.optim.LBFGS([beta], lr=self.lr_lbfgs, line_search_fn='strong_wolfe')
 
                     def closure():
@@ -333,7 +348,10 @@ class EMDTrainer(Trainer):
             'best_mae': self.best_mae,
             'best_mse': self.best_mse,
             'best_epoch': self.best_epoch,
-            'wandb_id': self.wandb_id
+            'wandb_id': self.wandb_id,
+            'random_state': random.getstate(),
+            'np_random_state': np.random.get_state(),
+            'torch_random_state': torch.random.get_rng_state()
         }, save_path)
         self.save_list.append(save_path)  # control the number of saved models
 

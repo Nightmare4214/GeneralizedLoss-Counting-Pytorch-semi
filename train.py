@@ -10,9 +10,9 @@ args = None
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train ')
-    parser.add_argument('--save_dir', default='/mnt/data/PyTorch_model/GL_semi',
+    parser.add_argument('--save_dir', default='/home/icml007/Nightmare4214/PyTorch_model/GL_semi',
                         help='directory to save models.')
-    parser.add_argument('--data_dir', default='/mnt/data/datasets/UCF-Train-Val-Test',
+    parser.add_argument('--data_dir', default='/home/icml007/Nightmare4214/datasets/UCF-Train-Val-Test',
                         help='training data directory')
     parser.add_argument('--dataset', default='qnrf', help='dataset name: qnrf, nwpu, sha, shb')
     parser.add_argument('--o_cn', type=int, default=1,
@@ -73,6 +73,8 @@ def parse_args():
     parser.add_argument('--downsample_ratio', type=int, default=8,
                         help='downsample ratio')
     parser.add_argument('--extra_aug', default=False, required=False, action='store_true', help='extra_aug')
+    parser.add_argument('--randomless', default=False, required=False, action='store_true', help='randomless')
+    parser.add_argument('--seed', type=int, default=42, help='random seed')
 
     args = parser.parse_args()
     if args.dataset.lower() == 'qnrf':
@@ -91,7 +93,7 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.benchmark = True
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
     trainer = EMDTrainer(args)
     trainer.setup()
