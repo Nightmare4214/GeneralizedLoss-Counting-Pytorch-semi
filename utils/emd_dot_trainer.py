@@ -48,19 +48,14 @@ def kl_conjugate(x):
 
 def tv_conjugate(x):
     """
-    phi(x) = |x - 1|;
-    phi*(x) = min{-1, x} x <= 1,
-              +inf, x > 1;
+    phi(x) = rho|x - 1|;
+    phi*(x) = min{-rho, x} x <= rho,
+              +inf, x > rho;
 
     :param x: input (B, a, 1)
     :return: conjugate of phi (B, a, 1)
     """
-    mask1 = x < -1
-    mask2 = x > 1
-    x[mask1] = -1
-    x[mask2] = torch.inf
-    # return torch.min(x, -torch.ones_like(x))
-    return x
+    return torch.clamp(x, min=-1, max=1)
 
 
 def phi_conjugate(x, phi_function='kl'):
