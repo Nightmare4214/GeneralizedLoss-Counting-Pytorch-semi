@@ -36,17 +36,17 @@ def grid(H, W, stride):
     y, x = torch.meshgrid([coody.type(dtype) / 1, coodx.type(dtype) / 1], indexing='ij')  # (h_i, w_i)
     return torch.stack((x, y), dim=2).view(-1, 2)  # (w_i, h_i)
 
-def kl_conjugate(x):
+def kl_conjugate(x, rho=1):
     """
-    phi(x) = xln(x) - x + 1;
-    phi*(x) = e^x - 1;
+    phi(x) = rho(xln(x) - x + 1);
+    phi*(x) = rho(e^{x/rho} - 1);
 
     :param x: input (B, a, 1)
     :return: conjugate of phi (B, a, 1)
     """
-    return x.exp() - 1
+    return rho * ((x / rho).exp() - 1)
 
-def tv_conjugate(x):
+def tv_conjugate(x, rho=1):
     """
     phi(x) = rho|x - 1|;
     phi*(x) = min{-rho, x} x <= rho,
@@ -55,14 +55,14 @@ def tv_conjugate(x):
     :param x: input (B, a, 1)
     :return: conjugate of phi (B, a, 1)
     """
-    return torch.clamp(x, min=-1, max=1)
+    return torch.clamp(x, min=-rho, max=rho)
 
 
-def phi_conjugate(x, phi_function='kl'):
+def phi_conjugate(x, phi_function='kl', rho=1):
     if phi_function.lower() == 'kl':
-        return kl_conjugate(x)
+        return kl_conjugate(x, rho)
     elif phi_function.lower() == 'tv':
-        return tv_conjugate(x)
+        return tv_conjugate(x, rho)
     raise NotImplementedError
 
 
@@ -82,7 +82,7 @@ def c_transform(C, beta, epsilon):
     return -epsilon * torch.logsumexp((torch.transpose(beta, -1, -2) - C) / epsilon, dim=-1, keepdim=True)
 
 
-def G(C, beta, u, v, epsilon, reduction='mean', phi_function='KL'):
+def G(C, beta, u, v, epsilon, reduction='mean', phi_function='KL', rho=1):
     """
     -phi*(-alpha^epsilon)^T u - phi*(-beta)^T v
 
@@ -95,8 +95,8 @@ def G(C, beta, u, v, epsilon, reduction='mean', phi_function='KL'):
     :return:
     """
     alpha_epsilon = c_transform(C, beta, epsilon)  # alpha^epsilon
-    loss = -torch.bmm(torch.transpose(phi_conjugate(-alpha_epsilon, phi_function), -1, -2), u) - torch.bmm(
-        torch.transpose(phi_conjugate(-beta, phi_function), -1, -2), v)
+    loss = -torch.bmm(torch.transpose(phi_conjugate(-alpha_epsilon, phi_function, rho), -1, -2), u) - torch.bmm(
+        torch.transpose(phi_conjugate(-beta, phi_function, rho), -1, -2), v)
     if 'mean' == reduction:
         return torch.mean(loss)
     elif 'sum' == reduction:
@@ -174,6 +174,7 @@ class EMDTrainer(Trainer):
                             for x in ['train', 'val']}
 
         self.phi = args.phi
+        self.rho = args.rho
         torch.cuda.empty_cache()
         self.model = vgg19()
         self.model.to(self.device)
@@ -211,7 +212,7 @@ class EMDTrainer(Trainer):
                 if args.randomless:
                     random.setstate(checkpoint['random_state'])
                     np.random.set_state(checkpoint['np_random_state'])
-                    torch.random.set_rng_state(checkpoint['torch_random_state'])
+                    torch.random.set_rng_state(checkpoint['torch_random_state'].cpu())
             elif suf == '.pth':
                 self.model.load_state_dict(torch.load(args.resume, self.device))
 
@@ -295,7 +296,7 @@ class EMDTrainer(Trainer):
                     def closure():
                         lbfgs.zero_grad()
                         # max g => min -g
-                        g = -G(C, beta, u, v, self.blur, phi_function=self.phi)
+                        g = -G(C, beta, u, v, self.blur, phi_function=self.phi, rho=self.rho)
                         g.backward(inputs=beta)
                         return g
 
@@ -303,10 +304,10 @@ class EMDTrainer(Trainer):
                     lbfgs.step(closure)
                     beta = beta.detach()
                     beta.requires_grad = False
-                    loss += G(C, beta, u, v, self.blur, phi_function=self.phi)
+                    loss += G(C, beta, u, v, self.blur, phi_function=self.phi, rho=self.rho)
 
                 i += 1
-
+            loss /= float(shape[0])
             self.optimizer.zero_grad()
             # minimize W by optimizing theta
             loss.backward()
