@@ -126,6 +126,7 @@ class Crowd(data.Dataset):
 
     def train_transform_with_crop(self, img, keypoints):
         """random crop image patch and find people in it"""
+        # pillow: first width then height
         wd, ht = img.size
         if self.extra_aug:
             # assert len(keypoints) > 0
@@ -165,6 +166,9 @@ class Crowd(data.Dataset):
         target = ratio[mask]
         keypoints = keypoints[mask]
         keypoints = keypoints[:, :2] - [j, i]  # change coodinate
+        idx_mask = (keypoints[:, 0] >= 0) * (keypoints[:, 0] < w) * \
+                       (keypoints[:, 1] >= 0) * (keypoints[:, 1] < h)
+        keypoints = keypoints[idx_mask]
         if len(keypoints) > 0:
             if random.random() > 0.5:
                 img = F.hflip(img)
@@ -216,6 +220,7 @@ class Crowd_sh(data.Dataset):
             return img, keypoints, name
 
     def train_transform(self, img, keypoints):
+        # pillow: first width then height
         wd, ht = img.size
         if self.extra_aug:
             # assert len(keypoints) > 0
@@ -244,8 +249,8 @@ class Crowd_sh(data.Dataset):
         img = F.crop(img, i, j, h, w)
         if len(keypoints) > 0:
             keypoints = keypoints - [j, i]
-            idx_mask = (keypoints[:, 0] >= 0) * (keypoints[:, 0] <= w) * \
-                       (keypoints[:, 1] >= 0) * (keypoints[:, 1] <= h)
+            idx_mask = (keypoints[:, 0] >= 0) * (keypoints[:, 0] < w) * \
+                       (keypoints[:, 1] >= 0) * (keypoints[:, 1] < h)
             keypoints = keypoints[idx_mask]
         else:
             keypoints = np.empty([0, 2])

@@ -26,10 +26,10 @@ locate = True
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Test ')
-    parser.add_argument('--data_dir', default='/mnt/data/datasets/UCF-Train-Val-Test',
+    parser.add_argument('--data_dir', default='/home/icml007/Nightmare4214/datasets/ShanghaiTech_Crowd_Counting_Dataset-Train-Val-Test/part_B',
                         help='training data directory')
     parser.add_argument('--save_dir',
-                        default='/mnt/data/PycharmProject/GeneralizedLoss-Counting-Pytorch/ucf_vgg19_ot_84.pth',
+                        default='/home/icml007/Nightmare4214/PyTorch_model/UOT_shanghai_B/max_epoch_1000_crop_size_512_extra_aug_True_downsample_ratio_8_lr_1e-05_scheduler_poly_cost_p_norm_scale_0.6_blur_0.01_scaling_0.5_p_1_rho_1_rho2_None_tl_iter_2000_p_norm_2.0_norm_coord_1_phi_KL_reg_entropy_lambda_reg_1.0_batch_size_1_0112-214246/best_val.pth',
                         help='model path')
     parser.add_argument('--dataset', default='qnrf', help='dataset name: qnrf, nwpu, sha, shb')
     parser.add_argument('--device', default='0', help='assign device')
